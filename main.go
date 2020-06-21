@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -12,6 +13,11 @@ import (
 type Account struct {
 	income, percentageUsed int
 	expenses, splits map[string]int
+}
+
+type Tuple struct {
+	val1 string
+	val2 int
 }
 
 func scanLine() string {
@@ -42,40 +48,29 @@ func (account *Account) initInitialSplit() {
 }
 
 func (account *Account) scanExpenses() bool {
-	var expense string
-
 	fmt.Println("Please enter expenses! In this format \"type:amount -- Example: Food:300\"! You can also finish with expenses by typing finish!")
-	expense = scanLine()
-
-	if strings.Contains(expense, "finish") {
-		account.initInitialSplit()
-		return true
-	}
-
-	if strings.ContainsRune(expense, ':') == false {
-		fmt.Println("Format for expense is not compatible!")
-		return false
-	}
-	
-	splittedExpense := strings.Split(expense, ":")
-	name := splittedExpense[0]
-	amount, err := strconv.Atoi(splittedExpense[1])
+	tuple, err := getNameValueFormatFromUser()
 
 	if err != nil {
-		fmt.Println("Error")
+		if tuple.val1 == "finish" {
+			account.initInitialSplit()
+			return true
+		}
+
+		fmt.Println(err.Error())
 		return false
 	}
 
-	_, ok := account.expenses[name]
+	_, ok := account.expenses[tuple.val1]
 
 	// if we do not have the name in the expense map
 	// just set it
 	if ok == false {
-		account.expenses[name] = amount
+		account.expenses[tuple.val1] = tuple.val2
 		return false
 	}
 
-	account.expenses[name] += amount
+	account.expenses[tuple.val1] += tuple.val2
 
 	return false
 }
@@ -84,45 +79,59 @@ func (account *Account) scanPercentages() bool {
 	fmt.Printf("Percentage used: %v --- %v left \n", account.percentageUsed, 100 - account.percentageUsed)
 	fmt.Println("Please enter splits! In this format \"type:amount -- Example: House:20\"! You can also finish with splits by typing finish!")
 
-	split := scanLine()
-
-	if strings.ContainsRune(split, ':') == false {
-		fmt.Println("Format for split is not compatible!")
-		return false
-	}
-
-	splittedSplit := strings.Split(split, ":")
-	name := splittedSplit[0]
-	amount, err := strconv.Atoi(splittedSplit[1])
+	tuple, err := getNameValueFormatFromUser()
 
 	if err != nil {
+		if tuple.val1 == "finish" {
+			return true
+		}
+
+		fmt.Println(err.Error())
 		return false
 	}
 
-	_, ok := account.splits[name]
+	_, ok := account.splits[tuple.val1]
 
 	// if we do not have the name in the expense map
 	// just set it
 	if ok == true {
-		fmt.Printf("%v is already used", name)
+		fmt.Printf("%v is already used", tuple.val1)
 		return false
 	}
 
 	// if user has enter amount less than 0 and percent greater than 100 with the sum of other percentage
 	// we will say the they exceed the percentage limit
-	if amount < 0 || amount + account.percentageUsed > 100 {
+	if tuple.val2 < 0 || tuple.val2 + account.percentageUsed > 100 {
 		fmt.Println("You are exceeding the percentage limit!")
 		return false
 	}
 
-	account.percentageUsed += amount
-	account.splits[name] = amount
+	account.percentageUsed += tuple.val2
+	account.splits[tuple.val1] = tuple.val2
 
 	if account.percentageUsed >= 100 {
 		return true
 	}
 
 	return false
+}
+
+func getNameValueFormatFromUser() (tuple Tuple, error error) {
+	line := scanLine()
+
+	if strings.ContainsRune(line, ':') == false {
+		return Tuple{line, 0}, errors.New("format for split is not compatible")
+	}
+
+	splittedSplit := strings.Split(line, ":")
+	name := splittedSplit[0]
+	amount, err := strconv.Atoi(splittedSplit[1])
+
+	if err != nil {
+		return Tuple{line, 0}, errors.New("couldn't convert number")
+	}
+
+	return Tuple{name, amount}, nil
 }
 
 func (account *Account) showPlanning() {
